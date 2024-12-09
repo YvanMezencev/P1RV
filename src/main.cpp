@@ -17,14 +17,20 @@
 using namespace std;
 
 // Rotations autour de X et Y
-GLfloat cameraDistance = 200.0f; // Distance of the camera from the center
+float cameraX = 0.0f;
+float cameraY = 200.0f;  // Height of the camera
+float cameraZ = 0.0f;
 GLfloat angleX = 0.0f;     // Horizontal angle
 GLfloat angleY = 0.0f;     // Vertical angle
+float cameraDistance = 200.0f;
+
 GLfloat cameraLookAt[3] = { 0.0f, 0.0f, 0.0f }; // Camera looks at the center
-GLfloat cameraPosition[3] = { 0.0f, 200.0f, 200.0f }; // Initial camera position
+GLfloat cameraPosition[3] = { cameraX, cameraY, cameraZ }; // Initial camera position
 GLint oldX = 0;
 GLint oldY = 0;
 GLboolean boutonClick = false;
+
+float cameraSpeed = 5.0f;  // Movement speed
 
 int windowW = 640;
 int windowH = 480;
@@ -97,41 +103,66 @@ vector<unsigned int> generate_indices(const int& width, const int& height) {
 
 // Fonction de rappel de la souris
 GLvoid souris(int bouton, int etat, int x, int y) {
-    // Test pour voir si le bouton gauche de la souris est appuyé
     if (bouton == GLUT_LEFT_BUTTON && etat == GLUT_DOWN) {
         boutonClick = true;
         oldX = x;
         oldY = y;
     }
-
-    // si on relache le bouton gauche
-    if (bouton == GLUT_LEFT_BUTTON && etat == GLUT_UP) {
+    else if (bouton == GLUT_LEFT_BUTTON && etat == GLUT_UP) {
         boutonClick = false;
     }
 }
 
 GLvoid deplacementSouris(int x, int y) {
     if (boutonClick) {
-        angleX += (x - oldX) * 0.5f; // Adjust sensitivity
-        angleY += (y - oldY) * 0.5f;
+        // Calculate the change in mouse position
+        float deltaX = (x - oldX) * 0.1f; // Sensitivity for horizontal movement
+        float deltaY = (y - oldY) * 0.1f; // Sensitivity for vertical movement
 
-        // Clamp vertical angle to avoid flipping
+        // Update yaw and pitch angles
+        angleX += deltaX;          // Horizontal rotation (yaw)
+        angleY += deltaY;          // Vertical rotation (pitch)
+
+        // Clamp the pitch angle to avoid flipping
         if (angleY > 89.0f) angleY = 89.0f;
         if (angleY < -89.0f) angleY = -89.0f;
 
-        // Update camera position using spherical coordinates
-        float radX = angleX * PI / 180.0f;
-        float radY = angleY * PI / 180.0f;
+        // Update old mouse position
+        oldX = x;
+        oldY = y;
 
-        cameraPosition[0] = cameraLookAt[0] + cameraDistance * cos(radY) * sin(radX);
-        cameraPosition[1] = cameraLookAt[1] + cameraDistance * sin(radY);
-        cameraPosition[2] = cameraLookAt[2] + cameraDistance * cos(radY) * cos(radX);
-
-        glutPostRedisplay(); // Request redraw
+        // Request redisplay
+        glutPostRedisplay();
     }
+}
 
-    oldX = x;
-    oldY = y;
+GLvoid clavier(unsigned char key, int x, int y) {
+    // Convert angles to radians for movement
+    float radX = angleX * 3.14159265359f / 180.0f;
+    float radY = angleY * 3.14159265359f / 180.0f;
+
+    switch (key) {
+    case 'z': // Move forward
+        cameraX += cameraSpeed * sin(radY);
+        cameraZ -= cameraSpeed * cos(radY);
+        break;
+    case 's': // Move backward
+        cameraX -= cameraSpeed * sin(radY);
+        cameraZ += cameraSpeed * cos(radY);
+        break;
+    case 'q': // Move left
+        cameraX -= cameraSpeed * cos(radY);
+        cameraZ -= cameraSpeed * sin(radY);
+        break;
+    case 'd': // Move right
+        cameraX += cameraSpeed * cos(radY);
+        cameraZ += cameraSpeed * sin(radY);
+        break;
+    case 27: // Escape key to exit
+        exit(0);
+        break;
+    }
+    glutPostRedisplay();
 }
 
 // Callback de redimensionnement de la fenêtre
@@ -162,6 +193,8 @@ GLvoid redimensionner(int w, int h) {
     // TODO : peut-on changerle ratio ici pour un meilleur resultat ?
     gluPerspective(focale, (float)windowW / (float)windowH, near_p, far_p);
 
+   
+
     // Placement de la caméra
     gluLookAt(0, 200, 200, 0, 0, 0, 0, 1, 0);
 
@@ -181,10 +214,18 @@ GLvoid draw_map() {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
+    // Calculate the camera direction vector
+    float radPitch = angleY * 3.14159265359f / 180.0f; // Convert pitch to radians
+    float radYaw = angleX * 3.14159265359f / 180.0f;   // Convert yaw to radians
+
+    float dirX = cos(radPitch) * sin(radYaw);
+    float dirY = sin(radPitch);
+    float dirZ = -cos(radPitch) * cos(radYaw);
+
     gluLookAt(
-        cameraPosition[0], cameraPosition[1], cameraPosition[2], // Camera position
-        cameraLookAt[0], cameraLookAt[1], cameraLookAt[2],       // Look-at point
-        0.0f, 1.0f, 0.0f                                        // Up vector
+        cameraX, cameraY, cameraZ,                 // Camera position
+        cameraX + dirX, cameraY + dirY, cameraZ + dirZ, // Look at position
+        0.0f, 1.0f, 0.0f                          // Up vector
     );
 
     for (unsigned int i = 0; i < indices.size() - 2; i = i + 3) {
@@ -221,7 +262,7 @@ int main(int argc, char** argv)
 
     // Définition des fonctions de callbacks
     glutDisplayFunc(draw_map);
-    //glutKeyboardFunc(clavier);
+    glutKeyboardFunc(clavier);
     glutMouseFunc(souris);
     glutMotionFunc(deplacementSouris);
     glutReshapeFunc(redimensionner);
