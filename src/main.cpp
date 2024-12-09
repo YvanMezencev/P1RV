@@ -17,8 +17,11 @@
 using namespace std;
 
 // Rotations autour de X et Y
-GLfloat angleX = 0.0f;
-GLfloat angleY = 0.0f;
+GLfloat cameraDistance = 200.0f; // Distance of the camera from the center
+GLfloat angleX = 0.0f;     // Horizontal angle
+GLfloat angleY = 0.0f;     // Vertical angle
+GLfloat cameraLookAt[3] = { 0.0f, 0.0f, 0.0f }; // Camera looks at the center
+GLfloat cameraPosition[3] = { 0.0f, 200.0f, 200.0f }; // Initial camera position
 GLint oldX = 0;
 GLint oldY = 0;
 GLboolean boutonClick = false;
@@ -28,6 +31,8 @@ int windowH = 480;
 float focale = 65.0f;
 float near_p = 0.1f;
 float far_p = 1000.0f;
+
+const float PI = 3.14159265359f;
 
 vector<float> load_triangle_vertices(const char* file_path, int& height, int& width, int& channels) {
     //Chargement de l'image heightmap
@@ -106,18 +111,25 @@ GLvoid souris(int bouton, int etat, int x, int y) {
 }
 
 GLvoid deplacementSouris(int x, int y) {
-    // si le bouton gauche est appuye et qu'on se deplace
-    // alors on doit modifier les angles de rotations du cube
-    // en fonction de la derniere position de la souris 
-    // et de sa position actuelle
     if (boutonClick) {
-        angleX += (x - oldX);
-        angleY += (y - oldY);
-        // Appeler le re-affichage de la scene OpenGL
-        glutPostRedisplay();
+        angleX += (x - oldX) * 0.5f; // Adjust sensitivity
+        angleY += (y - oldY) * 0.5f;
+
+        // Clamp vertical angle to avoid flipping
+        if (angleY > 89.0f) angleY = 89.0f;
+        if (angleY < -89.0f) angleY = -89.0f;
+
+        // Update camera position using spherical coordinates
+        float radX = angleX * PI / 180.0f;
+        float radY = angleY * PI / 180.0f;
+
+        cameraPosition[0] = cameraLookAt[0] + cameraDistance * cos(radY) * sin(radX);
+        cameraPosition[1] = cameraLookAt[1] + cameraDistance * sin(radY);
+        cameraPosition[2] = cameraLookAt[2] + cameraDistance * cos(radY) * cos(radX);
+
+        glutPostRedisplay(); // Request redraw
     }
 
-    // Mise a jour des anciennes positions de la souris en X et Y
     oldX = x;
     oldY = y;
 }
@@ -148,10 +160,10 @@ GLvoid redimensionner(int w, int h) {
 
     // Mise en place de la perspective
     // TODO : peut-on changerle ratio ici pour un meilleur resultat ?
-    gluPerspective(focale, 4 / 3.0, near_p, far_p);
+    gluPerspective(focale, (float)windowW / (float)windowH, near_p, far_p);
 
     // Placement de la caméra
-    gluLookAt(0, 0, 0, 1000, 500, 1000, 0, 1, 0);
+    gluLookAt(0, 200, 200, 0, 0, 0, 0, 1, 0);
 
     // Retourne a la pile modelview
     glMatrixMode(GL_MODELVIEW);
@@ -159,7 +171,7 @@ GLvoid redimensionner(int w, int h) {
 
 GLvoid draw_map() {
     //static const char* file_path = "heightmaps/heightmap_1.png";
-    static const char* file_path = "C:/Users/Eleve/source/repos/P1RV_Project/heightmaps/heightmap_1.png"; //Change this path to your path to the heightmap you want to load
+    static const char* file_path = "C:/Users/Eleve/source/repos/P1RV_Project/heightmaps/peppers_128.png"; //Change this path to your path to the heightmap you want to load
     static int width, height, channels;
     static vector<float> vertices = load_triangle_vertices(file_path, width, height, channels);
     static vector<unsigned int> indices = generate_indices(width, height);
@@ -167,19 +179,23 @@ GLvoid draw_map() {
     // Effacement du frame buffer
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
-
     glLoadIdentity();
-    glRotatef(-angleY, 1.0f, 0.0f, 0.0f);
-    glRotatef(-angleX, 0.0f, 1.0f, 0.0f);
+
+    gluLookAt(
+        cameraPosition[0], cameraPosition[1], cameraPosition[2], // Camera position
+        cameraLookAt[0], cameraLookAt[1], cameraLookAt[2],       // Look-at point
+        0.0f, 1.0f, 0.0f                                        // Up vector
+    );
 
     for (unsigned int i = 0; i < indices.size() - 2; i = i + 3) {
         glBegin(GL_TRIANGLES);
         for (int j = 0; j < 3; j++) {
             float x = vertices[indices[i + j] * 3];
-            float y = vertices[indices[i + j] * 3 + 1];
-            float z = vertices[indices[i + j] * 3 + 2];
-            glColor3f(y / 510.0, y / 510.0, y / 510.0);
+            float y = vertices[(indices[i + j] * 3) + 1];
+            float z = vertices[(indices[i + j] * 3) + 2];
+            glColor3f(1.0, 1.0, 1.0);
             glVertex3f(x, y, z);
+            //cout << "Vertex drawn at " << x <<" " << y << " " << z << endl;
         }
         glEnd();
     }
