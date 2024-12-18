@@ -16,21 +16,16 @@
 
 using namespace std;
 
-// Rotations autour de X et Y
-float cameraX = 0.0f;
-float cameraY = 200.0f;  // Height of the camera
-float cameraZ = 0.0f;
 GLfloat angleX = 0.0f;     // Horizontal angle
 GLfloat angleY = 0.0f;     // Vertical angle
 float cameraDistance = 200.0f;
 
-GLfloat cameraLookAt[3] = { 0.0f, 0.0f, 0.0f }; // Camera looks at the center
-GLfloat cameraPosition[3] = { cameraX, cameraY, cameraZ }; // Initial camera position
-GLint oldX = 0;
-GLint oldY = 0;
-GLboolean boutonClick = false;
+float posX = 200.0f, posY = 200.0f, posZ = 5.0f; // Position de la caméra
+bool boutonClick = false;
+int oldX = 0, oldY = 0; // Anciennes positions de la souris
 
-float cameraSpeed = 5.0f;  // Movement speed
+float movementSpeed = 5.0f;  // Movement speed
+float rotationSpeed = 0.2f; //Rotation speed
 
 int windowW = 640;
 int windowH = 480;
@@ -38,7 +33,7 @@ float focale = 65.0f;
 float near_p = 0.1f;
 float far_p = 1000.0f;
 
-const float PI = 3.14159265359f;
+const float M_PI = 3.14159265359f;
 
 vector<float> load_triangle_vertices(const char* file_path, int& height, int& width, int& channels) {
     //Chargement de l'image heightmap
@@ -101,23 +96,6 @@ vector<unsigned int> generate_indices(const int& width, const int& height) {
     return indices;
 }
 
-void calculateCameraDirections(float& forwardX, float& forwardY, float& forwardZ,
-    float& rightX, float& rightY, float& rightZ) {
-    // Convert angles to radians
-    float radAngleX = angleX * 3.14159265359f / 180.0f; // Horizontal rotation (yaw)
-    float radAngleY = angleY * 3.14159265359f / 180.0f; // Vertical rotation (pitch)
-
-    // Forward vector (based on pitch and yaw)
-    forwardX = cos(radAngleY) * sin(radAngleX);
-    forwardY = -sin(radAngleY);
-    forwardZ = -cos(radAngleY) * cos(radAngleX);
-
-    // Right vector (perpendicular to the forward vector, ignoring pitch)
-    rightX = sin(radAngleX - 3.14159265359f / 2.0f);
-    rightY = 0.0f;
-    rightZ = -cos(radAngleX - 3.14159265359f / 2.0f);
-}
-
 // Fonction de rappel de la souris
 GLvoid souris(int bouton, int etat, int x, int y) {
     if (bouton == GLUT_LEFT_BUTTON && etat == GLUT_DOWN) {
@@ -132,65 +110,53 @@ GLvoid souris(int bouton, int etat, int x, int y) {
 
 GLvoid deplacementSouris(int x, int y) {
     if (boutonClick) {
-        float sensitivity = 0.1f; // Adjust sensitivity as needed
-        angleX += (x - oldX) * sensitivity;
-        angleY += (y - oldY) * sensitivity;
+        int deltaX = x - oldX;
+        int deltaY = y - oldY;
 
-        // Clamp pitch to avoid flipping
+        angleX += deltaX * rotationSpeed; // Sensibilité de la souris
+        angleY += deltaY * rotationSpeed;
+
+        // Limiter l'angle Y pour éviter de regarder complètement en haut/bas
         if (angleY > 89.0f) angleY = 89.0f;
         if (angleY < -89.0f) angleY = -89.0f;
 
-        // Update the old mouse position
         oldX = x;
         oldY = y;
-
-        // Update the camera look-at vector
-        float forwardX, forwardY, forwardZ;
-        calculateCameraDirections(forwardX, forwardY, forwardZ, forwardX, forwardY, forwardZ);
-        cameraLookAt[0] = cameraX + forwardX;
-        cameraLookAt[1] = cameraY + forwardY;
-        cameraLookAt[2] = cameraZ + forwardZ;
-
-        glutPostRedisplay();
     }
+    glutPostRedisplay();
 }
 
-void clavier(unsigned char key, int x, int y) {
-    float moveSpeed = 5.0f; // Adjust speed as needed
+GLvoid clavier(unsigned char key, int x, int y) {
+    float radAngleX = angleX * M_PI / 180.0f; // Conversion en radians
+    float radAngleY = angleY * M_PI / 180.0f;
 
-    // Calculate direction vectors
-    float forwardX, forwardY, forwardZ;
-    float rightX, rightY, rightZ;
-    calculateCameraDirections(forwardX, forwardY, forwardZ, rightX, rightY, rightZ);
-
-    // Move based on key
-    if (key == 'z') { // Move forward
-        cameraX += forwardX * moveSpeed;
-        cameraY += forwardY * moveSpeed;
-        cameraZ += forwardZ * moveSpeed;
+    switch (key) {
+    case 'z': // Avancer
+        posX += sin(radAngleX) * movementSpeed;
+        posZ -= cos(radAngleX) * movementSpeed;
+        break;
+    case 's': // Reculer
+        posX -= sin(radAngleX) * movementSpeed;
+        posZ += cos(radAngleX) * movementSpeed;
+        break;
+    case 'q': // Aller à gauche
+        posX -= cos(radAngleX) * movementSpeed;
+        posZ -= sin(radAngleX) * movementSpeed;
+        break;
+    case 'd': // Aller à droite
+        posX += cos(radAngleX) * movementSpeed;
+        posZ += sin(radAngleX) * movementSpeed;
+        break;
+    case 'e': // Monter
+        posY += movementSpeed;
+        break;
+    case 'c': // Descendre
+        posY -= movementSpeed;
+        break;
+    case 27: // Échap pour quitter
+        exit(0);
+        break;
     }
-    if (key == 's') { // Move backward
-        cameraX -= forwardX * moveSpeed;
-        cameraY -= forwardY * moveSpeed;
-        cameraZ -= forwardZ * moveSpeed;
-    }
-    if (key == 'q') { // Move left
-        cameraX += rightX * moveSpeed;
-        cameraY += rightY * moveSpeed;
-        cameraZ += rightZ * moveSpeed;
-    }
-    if (key == 'd') { // Move right
-        cameraX -= rightX * moveSpeed;
-        cameraY -= rightY * moveSpeed;
-        cameraZ -= rightZ * moveSpeed;
-    }
-
-    // Update the camera look-at vector to maintain orientation
-    cameraLookAt[0] = cameraX + forwardX;
-    cameraLookAt[1] = cameraY + forwardY;
-    cameraLookAt[2] = cameraZ + forwardZ;
-
-    // Redraw the scene
     glutPostRedisplay();
 }
 
@@ -222,10 +188,20 @@ GLvoid redimensionner(int w, int h) {
     // TODO : peut-on changerle ratio ici pour un meilleur resultat ?
     gluPerspective(focale, (float)windowW / (float)windowH, near_p, far_p);
 
-   
+    float radAngleX = angleX * M_PI / 180.0f;
+    float radAngleY = angleY * M_PI / 180.0f;
+
+    // Calcul de la direction de vue
+    float dirX = cos(radAngleY) * sin(radAngleX);
+    float dirY = sin(radAngleY);
+    float dirZ = -cos(radAngleY) * cos(radAngleX);
 
     // Placement de la caméra
-    gluLookAt(0, 200, 200, 0, 0, 0, 0, 1, 0);
+    gluLookAt(
+        posX, posY, posZ,           // Position de la caméra
+        posX + dirX, posY + dirY, posZ + dirZ, // Direction de la vue
+        0.0f, 1.0f, 0.0f            // Vecteur "up" (Y positif)
+    );
 
     // Retourne a la pile modelview
     glMatrixMode(GL_MODELVIEW);
@@ -233,32 +209,33 @@ GLvoid redimensionner(int w, int h) {
 
 GLvoid draw_map() {
     //static const char* file_path = "heightmaps/heightmap_1.png";
-    static const char* file_path = "C:/Users/Eleve/source/repos/P1RV_Project/heightmaps/peppers_128.png"; //Change this path to your path to the heightmap you want to load
+    static const char* file_path = "C:/Users/Eleve/source/repos/P1RV_Project/heightmaps/heightmap_2.png"; //Change this path to your path to the heightmap you want to load
     static int width, height, channels;
     static vector<float> vertices = load_triangle_vertices(file_path, width, height, channels);
     static vector<unsigned int> indices = generate_indices(width, height);
 
     // Effacement du frame buffer
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glMatrixMode(GL_MODELVIEW);
+    //glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    // Calculate the camera direction vector
-    float radPitch = angleY * 3.14159265359f / 180.0f; // Convert pitch to radians
-    float radYaw = angleX * 3.14159265359f / 180.0f;   // Convert yaw to radians
+    float radAngleX = angleX * M_PI / 180.0f;
+    float radAngleY = angleY * M_PI / 180.0f;
 
-    float dirX = cos(radPitch) * sin(radYaw);
-    float dirY = sin(radPitch);
-    float dirZ = -cos(radPitch) * cos(radYaw);
+    // Calcul de la direction de vue
+    float dirX = cos(radAngleY) * sin(radAngleX);
+    float dirY = -sin(radAngleY);
+    float dirZ = -cos(radAngleY) * cos(radAngleX);
 
+    // Calcul de la position de "lookAt"
     gluLookAt(
-        cameraX, cameraY, cameraZ,                 // Camera position
-        cameraX + dirX, cameraY + dirY, cameraZ + dirZ, // Look at position
-        0.0f, 1.0f, 0.0f                          // Up vector
+        posX, posY, posZ,           // Position de la caméra
+        posX + dirX, posY + dirY, posZ + dirZ, // Direction de la vue
+        0.0f, 1.0f, 0.0f            // Vecteur "up" (Y positif)
     );
 
+    glBegin(GL_TRIANGLES);
     for (unsigned int i = 0; i < indices.size() - 2; i = i + 3) {
-        glBegin(GL_TRIANGLES);
         for (int j = 0; j < 3; j++) {
             float x = vertices[indices[i + j] * 3];
             float y = vertices[(indices[i + j] * 3) + 1];
@@ -267,8 +244,8 @@ GLvoid draw_map() {
             glVertex3f(x, y, z);
             //cout << "Vertex drawn at " << x <<" " << y << " " << z << endl;
         }
-        glEnd();
     }
+    glEnd();
     glFlush();
     glutSwapBuffers();
     cout << "Map drawn; AngleX: " << angleX << "; AngleY: " << angleY << endl;
