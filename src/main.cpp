@@ -35,7 +35,7 @@ float far_p = 1000.0f;
 
 const float M_PI = 3.14159265359f;
 
-vector<float> load_triangle_vertices(const char* file_path, int& height, int& width, int& channels) {
+vector<float> load_triangle_vertices(const char* file_path, int& height, int& width, int& channels, float& min_hauteur, float& max_hauteur) {
     //Chargement de l'image heightmap
     unsigned char* img = stbi_load(file_path, &width, &height, &channels, 1);
 
@@ -48,8 +48,6 @@ vector<float> load_triangle_vertices(const char* file_path, int& height, int& wi
     //Creation du mesh
     vector<float> vertices;
     float yScale = 512.0f / 256.0f, yShift = 0.0f;
-    float min_hauteur = 1e9;
-    float max_hauteur = -1e9;
 
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
@@ -85,12 +83,17 @@ vector<unsigned int> generate_indices(const int& width, const int& height) {
     vector<unsigned int> indices;
     for (int i = 0; i < height - 1; i++)       // Pour chaque rangée
     {
-        for (int j = 0; j < width; j++)      // Pour chaque colonne
+        for (int j = 0; j < width - 1; j++)      // Pour chaque colonne
         {
-            for (int k = 0; k < 2; k++)      // Pour chaque cotée de la rangée (haut ou bas)
-            {
-                indices.push_back(j + width * (i + k));
-            }
+            // Triangle 1
+            indices.push_back(i * width + j);
+            indices.push_back((i + 1) * width + j);
+            indices.push_back(i * width + (j + 1));
+
+            // Triangle 2
+            indices.push_back(i * width + (j + 1));
+            indices.push_back((i + 1) * width + j);
+            indices.push_back((i + 1) * width + (j + 1));
         }
     }
     return indices;
@@ -211,12 +214,13 @@ GLvoid draw_map() {
     //static const char* file_path = "heightmaps/heightmap_1.png";
     static const char* file_path = "C:/Users/Eleve/source/repos/P1RV_Project/heightmaps/heightmap_2.png"; //Change this path to your path to the heightmap you want to load
     static int width, height, channels;
-    static vector<float> vertices = load_triangle_vertices(file_path, width, height, channels);
+    static float min_hauteur, max_hauteur;
+    static vector<float> vertices = load_triangle_vertices(file_path, width, height, channels, min_hauteur, max_hauteur);
     static vector<unsigned int> indices = generate_indices(width, height);
 
     // Effacement du frame buffer
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    //glMatrixMode(GL_MODELVIEW);
+    glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
     float radAngleX = angleX * M_PI / 180.0f;
@@ -240,7 +244,7 @@ GLvoid draw_map() {
             float x = vertices[indices[i + j] * 3];
             float y = vertices[(indices[i + j] * 3) + 1];
             float z = vertices[(indices[i + j] * 3) + 2];
-            glColor3f(1.0, 1.0, 1.0);
+            glColor3f(y / max_hauteur, y / max_hauteur, y / max_hauteur);
             glVertex3f(x, y, z);
             //cout << "Vertex drawn at " << x <<" " << y << " " << z << endl;
         }
