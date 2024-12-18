@@ -101,6 +101,23 @@ vector<unsigned int> generate_indices(const int& width, const int& height) {
     return indices;
 }
 
+void calculateCameraDirections(float& forwardX, float& forwardY, float& forwardZ,
+    float& rightX, float& rightY, float& rightZ) {
+    // Convert angles to radians
+    float radAngleX = angleX * 3.14159265359f / 180.0f; // Horizontal rotation (yaw)
+    float radAngleY = angleY * 3.14159265359f / 180.0f; // Vertical rotation (pitch)
+
+    // Forward vector (based on pitch and yaw)
+    forwardX = cos(radAngleY) * sin(radAngleX);
+    forwardY = -sin(radAngleY);
+    forwardZ = -cos(radAngleY) * cos(radAngleX);
+
+    // Right vector (perpendicular to the forward vector, ignoring pitch)
+    rightX = sin(radAngleX - 3.14159265359f / 2.0f);
+    rightY = 0.0f;
+    rightZ = -cos(radAngleX - 3.14159265359f / 2.0f);
+}
+
 // Fonction de rappel de la souris
 GLvoid souris(int bouton, int etat, int x, int y) {
     if (bouton == GLUT_LEFT_BUTTON && etat == GLUT_DOWN) {
@@ -115,53 +132,65 @@ GLvoid souris(int bouton, int etat, int x, int y) {
 
 GLvoid deplacementSouris(int x, int y) {
     if (boutonClick) {
-        // Calculate the change in mouse position
-        float deltaX = (x - oldX) * 0.1f; // Sensitivity for horizontal movement
-        float deltaY = (y - oldY) * 0.1f; // Sensitivity for vertical movement
+        float sensitivity = 0.1f; // Adjust sensitivity as needed
+        angleX += (x - oldX) * sensitivity;
+        angleY += (y - oldY) * sensitivity;
 
-        // Update yaw and pitch angles
-        angleX += deltaX;          // Horizontal rotation (yaw)
-        angleY += deltaY;          // Vertical rotation (pitch)
-
-        // Clamp the pitch angle to avoid flipping
+        // Clamp pitch to avoid flipping
         if (angleY > 89.0f) angleY = 89.0f;
         if (angleY < -89.0f) angleY = -89.0f;
 
-        // Update old mouse position
+        // Update the old mouse position
         oldX = x;
         oldY = y;
 
-        // Request redisplay
+        // Update the camera look-at vector
+        float forwardX, forwardY, forwardZ;
+        calculateCameraDirections(forwardX, forwardY, forwardZ, forwardX, forwardY, forwardZ);
+        cameraLookAt[0] = cameraX + forwardX;
+        cameraLookAt[1] = cameraY + forwardY;
+        cameraLookAt[2] = cameraZ + forwardZ;
+
         glutPostRedisplay();
     }
 }
 
-GLvoid clavier(unsigned char key, int x, int y) {
-    // Convert angles to radians for movement
-    float radX = angleX * 3.14159265359f / 180.0f;
-    float radY = angleY * 3.14159265359f / 180.0f;
+void clavier(unsigned char key, int x, int y) {
+    float moveSpeed = 5.0f; // Adjust speed as needed
 
-    switch (key) {
-    case 'z': // Move forward
-        cameraX += cameraSpeed * sin(radY);
-        cameraZ -= cameraSpeed * cos(radY);
-        break;
-    case 's': // Move backward
-        cameraX -= cameraSpeed * sin(radY);
-        cameraZ += cameraSpeed * cos(radY);
-        break;
-    case 'q': // Move left
-        cameraX -= cameraSpeed * cos(radY);
-        cameraZ -= cameraSpeed * sin(radY);
-        break;
-    case 'd': // Move right
-        cameraX += cameraSpeed * cos(radY);
-        cameraZ += cameraSpeed * sin(radY);
-        break;
-    case 27: // Escape key to exit
-        exit(0);
-        break;
+    // Calculate direction vectors
+    float forwardX, forwardY, forwardZ;
+    float rightX, rightY, rightZ;
+    calculateCameraDirections(forwardX, forwardY, forwardZ, rightX, rightY, rightZ);
+
+    // Move based on key
+    if (key == 'z') { // Move forward
+        cameraX += forwardX * moveSpeed;
+        cameraY += forwardY * moveSpeed;
+        cameraZ += forwardZ * moveSpeed;
     }
+    if (key == 's') { // Move backward
+        cameraX -= forwardX * moveSpeed;
+        cameraY -= forwardY * moveSpeed;
+        cameraZ -= forwardZ * moveSpeed;
+    }
+    if (key == 'q') { // Move left
+        cameraX += rightX * moveSpeed;
+        cameraY += rightY * moveSpeed;
+        cameraZ += rightZ * moveSpeed;
+    }
+    if (key == 'd') { // Move right
+        cameraX -= rightX * moveSpeed;
+        cameraY -= rightY * moveSpeed;
+        cameraZ -= rightZ * moveSpeed;
+    }
+
+    // Update the camera look-at vector to maintain orientation
+    cameraLookAt[0] = cameraX + forwardX;
+    cameraLookAt[1] = cameraY + forwardY;
+    cameraLookAt[2] = cameraZ + forwardZ;
+
+    // Redraw the scene
     glutPostRedisplay();
 }
 
