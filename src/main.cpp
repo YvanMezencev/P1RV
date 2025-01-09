@@ -33,6 +33,13 @@ float focale = 65.0f;
 float near_p = 0.1f;
 float far_p = 1000.0f;
 
+#define GRAYSCALE 0
+#define HEATMAP 1
+#define TERRAINMAP 2
+#define COOLTOWARM 3
+
+int colorScaleMode = TERRAINMAP;
+
 const float M_PI = 3.14159265359f;
 
 vector<float> load_triangle_vertices(const char* file_path, int& height, int& width, int& channels, float& min_hauteur, float& max_hauteur) {
@@ -47,7 +54,7 @@ vector<float> load_triangle_vertices(const char* file_path, int& height, int& wi
 
     //Creation du mesh
     vector<float> vertices;
-    float yScale = 512.0f / 256.0f, yShift = 0.0f;
+    float yScale = 128.0f / 256.0f, yShift = 0.0f;
 
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
@@ -244,7 +251,25 @@ GLvoid draw_map() {
             float x = vertices[indices[i + j] * 3];
             float y = vertices[(indices[i + j] * 3) + 1];
             float z = vertices[(indices[i + j] * 3) + 2];
-            glColor3f(y / max_hauteur, y / max_hauteur, y / max_hauteur);
+            switch (colorScaleMode) {
+            case GRAYSCALE:
+                glColor3f(y / max_hauteur, y / max_hauteur, y / max_hauteur);
+                break;
+            case HEATMAP:
+                glColor3f(y / max_hauteur, y / max_hauteur * y / max_hauteur, 0.0);
+                break;
+            case TERRAINMAP:
+                if (y / max_hauteur < 0.5) {
+                    glColor3f(0.0, 2.0 * y / max_hauteur, 0.0); // Green
+                }
+                else {
+                    glColor3f((y / max_hauteur - 0.5) * 2.0, (1.0 - y / max_hauteur) * 2.0, (y / max_hauteur - 0.5) * 2.0); // Brown to White
+                }
+                break;
+            case COOLTOWARM:
+                glColor3f(y / max_hauteur, 0.0, 1.0 - y / max_hauteur);
+                break;
+            }
             glVertex3f(x, y, z);
             //cout << "Vertex drawn at " << x <<" " << y << " " << z << endl;
         }
