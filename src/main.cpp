@@ -260,10 +260,13 @@ GLvoid draw_map() {
                 break;
             case TERRAINMAP:
                 if (y / max_hauteur < 0.5) {
-                    glColor3f(0.0, 2.0 * y / max_hauteur, 0.0); // Green
+                    // Black to Green
+                    glColor3f(0.0, 2.0 * y / max_hauteur, 0.0);
                 }
                 else {
-                    glColor3f((y / max_hauteur - 0.5) * 2.0, (1.0 - y / max_hauteur) * 2.0, (y / max_hauteur - 0.5) * 2.0); // Brown to White
+                    // Green to Brown to White
+                    float high_t = (y / max_hauteur - 0.5) * 2.0;
+                    glColor3f(0.5 + high_t * 0.5, 0.5 - high_t * 0.5, high_t * 0.5);
                 }
                 break;
             case COOLTOWARM:
